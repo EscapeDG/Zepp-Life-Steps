@@ -5,26 +5,40 @@ on:
     - cron: '17 1,3,5,8,11 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout codes
-        uses: actions/checkout@v3
-      - name: Update system and install zsh
-        run: |
-          sudo -E apt-get -qq update
-          sudo -E apt-get install zsh -y
-          
+        uses: actions/checkout@v5
+
       - name: 初始化Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v6
         with:
-          python-version: 3.8
-          
+          python-version: "3.10"
+
       - name: 开始
         env:
-            CONFIG: ${{ secrets.CONFIG }}
+          CONFIG: ${{ secrets.CONFIG }}
+          AES_KEY: ${{ secrets.AES_KEY }}
         run: |
-          pip3 install requests pytz
-          python3 main.py
+          python -m pip install --upgrade pip
+          pip install requests pytz pycryptodome
+          python run_fixed.py
+
+      - name: 保存加密token缓存
+        if: always()
+        run: |
+          if [ -f encrypted_tokens.data ]; then
+            git config user.name github-actions
+            git config user.email github-actions@users.noreply.github.com
+            git add encrypted_tokens.data
+            if ! git diff --cached --quiet; then
+              git commit -m "persist Zepp login tokens"
+              git push origin master
+            fi
+          fi
